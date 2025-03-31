@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <h1>Analytics Dashboard</h1>
+    <h2>Tracking Data</h2>
+    <!-- <button onclick="loadData()">Load Analytics Data</button> -->
+    <table id="analytics-table">
+        <thead>
+            <tr>
+                <th>URL</th>
+                <th>IP Address</th>
+                <th>Browser</th>
+                <th>OS</th>
+                <th>Device</th>
+                <th>Screen Size</th>
+                <th>Language</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Data will be inserted here -->
+        </tbody>
+    </table>
+
+    <script>
+
+        const base_url = "https://self-hosted-analytics.vercel.app"
+
+        function getFullURL(addPath){
+            return base_url + addPath
+        }
+        async function loadData() {
+            try {
+
+                const url = getFullURL('/analytics');
+                const response = await fetch(url);
+                const data = await response.json();
+
+                const tableBody = document.querySelector("#analytics-table tbody");
+                tableBody.innerHTML = ''; // Clear previous data
+
+                data.forEach(item => {
+                    const row = document.createElement("tr");
+                    row.innerHTML = `
+                        <td>${item.url}</td>
+                        <td>${item.ip}</td>
+                        <td>${item.browser}</td>
+                        <td>${item.os}</td>
+                        <td>${item.device}</td>
+                        <td>${item.screenSize}</td>
+                        <td>${item.language}</td>
+                        <td>${new Date(item.time).toLocaleString()}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error("Error loading data:", error);
+            }
+        }
+
+        loadData();
+    </script>
+</body>
+</html>
