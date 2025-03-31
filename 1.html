@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        h1, h2 {
+            color: #2c3e50;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            background-color: white;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th {
+            padding: 12px 8px;
+            text-align: left;
+            background-color: #3498db;
+            color: white;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+        th:hover {
+            background-color: #2980b9;
+        }
+        th::after {
+            content: '';
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        th.asc::after {
+            content: '▲';
+        }
+        th.desc::after {
+            content: '▼';
+        }
+        td {
+            padding: 10px 8px;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        tr:hover {
+            background-color: #e9f7fe;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #777;
+        }
+        .error {
+            color: #e74c3c;
+            padding: 10px;
+            background-color: #fadbd8;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="main"></div>
+    
+    <script>
+        const base_url = "https://self-hosted-analytics.vercel.app";
+        let currentSortedColumn = null;
+        let isAscending = false;
+        let analyticsData = [];
+
+        function getFullURL(addPath) {
+            return base_url + addPath;
+        }
+
+        function main() {
+            const mainDiv = document.getElementById("main");
+            
+            const title = document.createElement("h1");
+            title.textContent = "Analytics Dashboard";
+            mainDiv.appendChild(title);
+            
+            const subtitle = document.createElement("h2");
+            subtitle.textContent = "Tracking Data";
+            mainDiv.appendChild(subtitle);
+            
+            const loadingDiv = document.createElement("div");
+            loadingDiv.className = "loading";
+            loadingDiv.textContent = "Loading analytics data...";
+            mainDiv.appendChild(loadingDiv);
+            
+            startLoadingData();
+        }
+
+        function createTableHTML(headers) {
+            const table = document.createElement("table");
+            table.id = "analytics-table";
+            
+            const thead = document.createElement("thead");
+            const headerRow = document.createElement("tr");
+            
+            headers.forEach(headerText => {
+                const th = document.createElement("th");
+                th.textContent = headerText;
+                th.addEventListener("click", () => sortTable(headerText));
+                headerRow.appendChild(th);
+                
+                // Set default sort on Time column
+                if (headerText === "Time" || headerText.toLowerCase().includes("date") || headerText.toLowerCase().includes("time")) {
+                    th.classList.add("desc");
+                    currentSortedColumn = headerText;
+                }
+            });
+            
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+            
+            const tbody = document.createElement("tbody");
+            tbody.id = "analytics-table-body";
+            table.appendChild(tbody);
+            
+            return table;
+        }
+
+        function populateTable(data) {
+            const tbody = document.getElementById("analytics-table-body");
+            tbody.innerHTML = "";
+            
+            data.forEach(item => {
+                const row = document.createElement("tr");
+                
+                Object.values(item).forEach(value => {
+                    const cell = document.createElement("td");
+                    cell.textContent = value;
+                    row.appendChild(cell);
+                });
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        function sortTable(column) {
+            // Reset previous sorting indicators
+            document.querySelectorAll("th").forEach(th => {
+                th.classList.remove("asc", "desc");
+            });
+            
+            // Set current sorting order
+            if (currentSortedColumn === column) {
+                isAscending = !isAscending;
+            } else {
+                currentSortedColumn = column;
+                isAscending = true;
+            }
+            
+            // Add sorting indicator
+            const headers = Array.from(document.querySelectorAll("th"));
+            const headerIndex = headers.findIndex(th => th.textContent === column);
+            headers[headerIndex].classList.add(isAscending ? "asc" : "desc");
+            
+            // Sort data
+            const columnIndex = Object.keys(analyticsData[0]).indexOf(column);
+            analyticsData.sort((a, b) => {
+                const valueA = Object.values(a)[columnIndex];
+                const valueB = Object.values(b)[columnIndex];
+                
+                // Check if values are dates
+                if (!isNaN(Date.parse(valueA)) && !isNaN(Date.parse(valueB))) {
+                    return isAscending ? 
+                        new Date(valueA) - new Date(valueB) : 
+                        new Date(valueB) - new Date(valueA);
+                }
+                
+                // Check if values are numbers
+                if (!isNaN(valueA) && !isNaN(valueB)) {
+                    return isAscending ? valueA - valueB : valueB - valueA;
+                }
+                
+                // Default string comparison
+                return isAscending ? 
+                    String(valueA).localeCompare(String(valueB)) : 
+                    String(valueB).localeCompare(String(valueA));
+            });
+            
+            populateTable(analyticsData);
+        }
+
+        async function startLoadingData() {
+            try {
+                const url = getFullURL('/analytics');
+                const response = await fetch(url);
+                const data = await response.json();
+
+                //remove _id field from data
+                data.forEach(item => {
+                    delete item._id;
+                });
+                console.log("Data loaded:", data);
+                
+                if (data && data.length > 0) {
+                    analyticsData = data;
+                    
+                    // Remove loading indicator
+                    const loadingDiv = document.querySelector(".loading");
+                    if (loadingDiv) {
+                        loadingDiv.remove();
+                    }
+                    
+                    // Create table with headers from data
+                    const headers = Object.keys(data[0]);
+                    const table = createTableHTML(headers);
+                    document.getElementById("main").appendChild(table);
+                    
+                    // Sort by default (Time/Date column, descending)
+                    const timeColumn = headers.find(h => h === "Time" || h.toLowerCase().includes("date") || h.toLowerCase().includes("time"));
+                    if (timeColumn) {
+                        sortTable(timeColumn);
+                    } else {
+                        // If no time column, just populate the table
+                        populateTable(data);
+                    }
+                } else {
+                    throw new Error("No data received");
+                }
+            } catch (error) {
+                console.error("Error loading data:", error);
+                const loadingDiv = document.querySelector(".loading");
+                if (loadingDiv) {
+                    loadingDiv.remove();
+                }
+                
+                const errorDiv = document.createElement("div");
+                errorDiv.className = "error";
+                errorDiv.textContent = "Failed to load analytics data. Please try again later.";
+                document.getElementById("main").appendChild(errorDiv);
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", main);
+    </script>
+</body>
+</html>
